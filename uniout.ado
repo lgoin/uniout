@@ -1,11 +1,12 @@
 * Author: Lucia Goin
+* Contact: lgoin@poverty-action.org
 * Purpose: Export univariate regressions with models in rows instead of columns
-* Date: 100215
+* Note: the program ParseMod is adapted from the manova.ado source file
 ****************************************************************************
 program uniout
 	version 11
 	
-	syntax anything(equalok) using/, [replace] [se RObust CLuster(varlist) avg(string) r p n lab dec(real 2) PNOte SENote]
+	syntax anything(equalok) using/, [replace] [se RObust CLuster(varlist) avg(string) r p n lab dec(real 2) ncol PNOte SENote]
 	
 	ParseMod `anything'
 	
@@ -265,6 +266,7 @@ qui {
 		}
 
 		
+		
 	local i 0
 		if "`lab'" == "" {
 			foreach name of local vars {
@@ -321,9 +323,45 @@ qui {
 							local d: word `j' of `col_labs'
 							replace `c' = "`d'" in 1
 						}
-			
+				drop list
 			
 		}
+		
+	* add column numbers
+	if "`ncol'" != "" {
+		expand 2 in 1
+		egen list = seq()
+		
+		if "`lab'" != "" {
+			replace list = 1.5 if _N == list
+			sort list
+			foreach var of varlist _all {
+				cap replace `var' ="" in 2
+				cap replace `var' =. in 2
+			}
+			local n: word count `lhs'
+			forvalues j = 1/`n' {
+				local c: word `j' of `lhs'
+				replace `c' = "(" + "`j'" + ")" in 2
+			}
+		drop list
+		}
+		
+		else if "`lab'" == "" {
+			replace list = 0 if _N == list
+			sort list
+			foreach var of varlist _all {
+				cap replace `var' ="" in 1
+				cap replace `var' =. in 1
+			}
+			local n: word count `lhs'
+			forvalues j = 1/`n' {
+				local c: word `j' of `lhs'
+				replace `c' = "(" + "`j'" + ")" in 1
+			}
+		drop list
+		}
+	}
 		
 		* include note at end of table
 			if "`pnote'" !="" {
@@ -350,13 +388,12 @@ qui {
 		rm regressions.csv
 	}
 	
-	cap drop list
 	xmlsave * using `using', doctype(excel) replace 
 	mac drop pval lhs_avg rhs_avg count se rsquared sterr
 	restore
 end
 
-* this program parses the syntax for the rhs and lhs variables
+* this program parses the syntax for the rhs and lhs variables; modified from the manova.ado source file
 program ParseMod, rclass
 
         gettoken yvar 0 : 0 , parse(" /:=")  // no need for comma in list here
